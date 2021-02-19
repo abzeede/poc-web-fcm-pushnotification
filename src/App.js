@@ -1,49 +1,56 @@
 import { useEffect, useState } from "react";
-import logo from "./logo.svg";
+import { messaging } from "./init-fcm";
 import "./App.css";
 
-import { messaging } from "./init-fcm";
-
 function App() {
-  const [token, setToken] = useState(null);
-  const [notification, setNotification] = useState({});
+  const [fcmToken, setFcmToken] = useState(null);
+  const [notificationData, setNotificationData] = useState({});
 
-  const registerPushListener = () =>
-    navigator.serviceWorker.addEventListener("message", ({ data }) => {
-      console.log(data);
-      setNotification(
-        data.data ? data.data : data["firebase-messaging-msg-data"].data.message
-      );
-    });
-
-  useEffect(() => {
+  const registerPushNotification = () => {
     messaging
       .requestPermission()
       .then(async function () {
+        // get fcm token
         const token = await messaging.getToken({
           vapidKey: process.env.REACT_APP_WEB_PUSH_CERTIFICATE_KEY,
         });
-        setToken(token);
+        setFcmToken(token);
+
+        // foreground event message
         messaging.onMessage((payload) => {
-          alert(JSON.stringify(payload));
+          const data = JSON.parse(payload.data.default);
+          setNotificationData(data);
         });
-        registerPushListener();
+
+        // background event message
+        navigator.serviceWorker.addEventListener("message", ({ data }) => {
+          setNotificationData(
+            data.data
+              ? data.data
+              : data["firebase-messaging-msg-data"].data.message
+          );
+        });
       })
       .catch(function (err) {
         console.log("Unable to get permission to notify.", err);
       });
-  }, []);
+  };
 
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Token:
-          <br /> {token} <br />
-          Notification: {JSON.stringify(notification)}
-        </p>
-      </header>
+      <div>
+        <button onClick={registerPushNotification}>
+          Register push notification
+        </button>
+      </div>
+      <p>
+        Token:
+        <br /> {fcmToken} <br />
+      </p>
+      <p>
+        Notification data: <br />
+        {JSON.stringify(notificationData)}
+      </p>
     </div>
   );
 }
